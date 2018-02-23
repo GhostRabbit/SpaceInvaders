@@ -27,8 +27,6 @@ function update() {
 
     checkForCollisions()
 
-    invaders = invaders.filter(i => i.alive)
-    shots = shots.filter(i => i.alive)
 }
 
 function checkForCollisions() {
@@ -39,6 +37,15 @@ function checkForCollisions() {
                 invader.hit()
                 shot.hit()
             }))
+    invaders = invaders.filter(i => i.alive)
+    shots = shots.filter(i => i.alive)
+
+    invaders
+        .filter(invader => invader.attacks(ship))
+        .map(invader => {
+            ship.attacked()
+            invader.attacked()
+        })
 }
 
 function show() {
@@ -53,33 +60,102 @@ function keyReleased() {
     }
 }
 
-class Ship {
-    constructor() {
-        this.pos = createVector(width / 2, height - 35)
+class MainPart {
+    constructor(pos) {
+        this.pos = pos
+        this.vel = createVector(0, 0)
+        this.angle = 0
+        this.avel = 0
+    }
+    update() {
+        this.pos.add(this.vel)
+        this.angle += this.avel
     }
 
     show() {
-        strokeWeight(1)
-        stroke(255, 0, 0)
-        fill(255, 240, 240)
         push()
         translate(this.pos.x, this.pos.y)
+        rotate(this.angle)
+        stroke(70, 70, 255)
+        fill(50, 50, 240)
         ellipse(0, 0, 20, 40)
-        ellipse(- 10, 20, 10, 20)
-        ellipse(10, 20, 10, 20)
+        pop()
+    }
+}
+
+class LegPart {
+    constructor(pos) {
+        this.pos = pos
+        this.vel = createVector(0, 0)
+        this.angle = 0
+        this.avel = 0
+    }
+    update() {
+        this.pos.add(this.vel)
+        this.angle += this.avel
+    }
+
+    show() {
+        push()
+        translate(this.pos.x, this.pos.y)
+        rotate(this.angle)
+        stroke(255, 255, 50)
+        fill(240, 240, 0)
+        ellipse(0, 0, 10, 20)
+        pop()
+    }
+}
+
+class Ship {
+    constructor() {
+        this.pos = createVector(width / 2, height - 35)
+        this.hp = 10
+        this.alive = true
+        this.parts = [
+            new MainPart(createVector(0, 0)),
+            new LegPart(createVector(10, 20)),
+            new LegPart(createVector(-10, 20))
+        ]
+    }
+
+    show() {
+        strokeWeight(2)
+        push()
+        translate(this.pos.x, this.pos.y)
+        this.parts.forEach(p => p.show())
         pop()
     }
 
     update() {
         let vel = createVector(0, 0)
-        if (keyIsDown(LEFT_ARROW)) vel.add(-1, 0)
-        if (keyIsDown(RIGHT_ARROW)) vel.add(1, 0)
-        ship.pos.add(vel)
-        ship.pos.x = constrain(ship.pos.x, 0, width)
+        if (this.alive) {
+            if (keyIsDown(LEFT_ARROW)) vel.add(-1, 0)
+            if (keyIsDown(RIGHT_ARROW)) vel.add(1, 0)
+        }
+        this.pos.add(vel)
+        this.pos.x = constrain(this.pos.x, 0, width)
+        this.parts.forEach(p => p.update())
     }
 
     shoot() {
-        shots.push(new Shot(this.pos.copy().add(0, -20)))
+        if (this.alive)
+            shots.push(new Shot(this.pos.copy().add(0, -20)))
+    }
+
+    explode() {
+        if (this.alive)
+            this.parts.forEach(p => {
+                p.vel = p5.Vector.random2D()
+                p.avel = random(-0.1, 0.1)
+            })
+    }
+
+    attacked() {
+        this.hp -= 2
+        if (this.hp <= 0) {
+            this.explode()
+            this.alive = false
+        }
     }
 }
 
@@ -112,17 +188,27 @@ class Invader {
         this.pos = pos
         this.r = 20
         this.wobble = 0
-        this.offset = 0
-        this.offsetDir = 1
+        this.offsetDir = [createVector(1, 0), createVector(0, 1), createVector(-1, 0), createVector(0, 1)]
+        this.offsetDirIndex = 0
+        this.offsetCounter = 25 / 2
         this.alive = true
         this.rotateDivisor = random(30, 90) * random([-1, 1])
     }
 
     update() {
         this.wobble = (this.wobble + 1) % 20
-        if ([25, -25].includes(this.offset)) this.offsetDir *= -1
-        this.offset += this.offsetDir
-        this.pos.x += this.offsetDir
+        if (this.hasAttacked) {
+            this.pos.y++
+        } else if (this.pos.y > width - 100) {
+            let dir = p5.Vector.sub(ship.pos, this.pos).normalize()
+            this.pos.add(dir)
+        } else {
+            if (this.offsetCounter++ > 25) {
+                this.offsetCounter = 0
+                this.offsetDirIndex = (this.offsetDirIndex + 1) % this.offsetDir.length
+            }
+            this.pos.add(this.offsetDir[this.offsetDirIndex])
+        }
     }
 
     show() {
@@ -143,5 +229,13 @@ class Invader {
 
     hit() {
         this.alive = false
+    }
+
+    attacks(ship) {
+        return this.pos.dist(ship.pos) < this.r
+    }
+
+    attacked() {
+        this.hasAttacked = true
     }
 }
