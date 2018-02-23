@@ -6,9 +6,12 @@ function setup() {
     createCanvas(500, 500)
     ship = new Ship()
     for (let i = 0; i < 5; i++) {
+        invaders.push(new Invader(createVector(map(i, 0, 4, 100, width - 100), 50)))
         invaders.push(new Invader(createVector(map(i, 0, 4, 100, width - 100), 100)))
+        invaders.push(new Invader(createVector(map(i, 0, 4, 100, width - 100), 150)))
+        invaders.push(new Invader(createVector(map(i, 0, 4, 100, width - 100), 200)))
     }
-    frameRate(50)
+    frameRate(60)
 }
 
 function draw() {
@@ -19,11 +22,23 @@ function draw() {
 
 function update() {
     invaders.forEach(i => i.update())
-    shots.forEach(s => s.update(invaders))
+    shots.forEach(s => s.update())
     ship.update()
 
+    checkForCollisions()
+
     invaders = invaders.filter(i => i.alive)
-    shots = shots.filter(s => s.alive)
+    shots = shots.filter(i => i.alive)
+}
+
+function checkForCollisions() {
+    shots.forEach(shot =>
+        invaders
+            .filter(invader => invader.collides(shot))
+            .map(invader => {
+                invader.hit()
+                shot.hit()
+            }))
 }
 
 function show() {
@@ -86,15 +101,9 @@ class Shot {
         this.alive = false
     }
 
-    update(invaders) {
+    update() {
         this.pos.add(this.vel)
         this.alive = this.pos.y > 0
-        invaders.forEach(i => {
-            if (i.pos.dist(this.pos) < this.r + i.r) {
-                this.hit()
-                i.hit()
-            }
-        })
     }
 }
 
@@ -103,24 +112,33 @@ class Invader {
         this.pos = pos
         this.r = 20
         this.wobble = 5
+        this.offset = 0
+        this.offsetDir = 1
         this.alive = true
         this.rotateDivisor = random(30, 90)
     }
 
     update() {
         this.wobble = (this.wobble + 1) % 20
+        if ([25, -25].includes(this.offset)) this.offsetDir *= -1
+        this.offset += this.offsetDir
+        this.pos.x += this.offsetDir
     }
 
     show() {
         strokeWeight(4)
-        stroke(0, 100, 0)
-        fill(0, 200, 0)
+        stroke(0, 200, 0)
+        fill(0, 100, 0)
         let w = this.wobble > 10 ? 15 - this.wobble : this.wobble - 5
         push()
         translate(this.pos.x, this.pos.y)
         rotate(frameCount / this.rotateDivisor + this.rotateDivisor)
         ellipse(0, 0, 2 * this.r + w, 2 * this.r - w)
         pop();
+    }
+
+    collides(shot) {
+        return this.pos.dist(shot.pos) < shot.r + this.r
     }
 
     hit() {
