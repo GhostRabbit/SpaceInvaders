@@ -111,11 +111,11 @@ class Invader {
     constructor(pos) {
         this.pos = pos
         this.r = 20
-        this.wobble = 5
+        this.wobble = 0
         this.offset = 0
         this.offsetDir = 1
         this.alive = true
-        this.rotateDivisor = random(30, 90)
+        this.rotateDivisor = random(30, 90) * random([-1, 1])
     }
 
     update() {
