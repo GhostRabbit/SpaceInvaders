@@ -1,6 +1,9 @@
 let ship
-this.shots = []
+let shots = []
 let invaders = []
+let gameOn = true
+let explosions = []
+
 
 function setup() {
     createCanvas(500, 500)
@@ -21,15 +24,18 @@ function draw() {
 }
 
 function update() {
-    invaders.forEach(i => i.update())
-    shots.forEach(s => s.update())
-    ship.update()
+    if (gameOn) {
+        explosions.forEach(e => e.update())
+        invaders.forEach(i => i.update())
+        shots.forEach(s => s.update())
+        ship.update()
 
-    checkForCollisions()
-
+        checkForCollisions()
+    }
 }
 
 function checkForCollisions() {
+    explosions = explosions.filter(e => e.alive)
     shots.forEach(shot =>
         invaders
             .filter(invader => invader.collides(shot))
@@ -41,17 +47,25 @@ function checkForCollisions() {
     shots = shots.filter(i => i.alive)
 
     invaders
-        .filter(invader => invader.attacks(ship))
+        .filter(invader => ship.alive && invader.attacks(ship))
         .map(invader => {
             ship.attacked()
-            invader.attacked()
+            invader.hit()
         })
 }
 
 function show() {
+    explosions.forEach(e => e.show())
     invaders.forEach(i => i.show())
     shots.forEach(s => s.show())
     ship.show()
+    if (!gameOn) {
+        textAlign(CENTER, CENTER)
+        textSize(64)
+        noStroke()
+        fill(255, 0, 0)
+        text("GAME OVER", width / 2, height / 2)
+    }
 }
 
 function keyReleased() {
@@ -143,11 +157,14 @@ class Ship {
     }
 
     explode() {
-        if (this.alive)
+        if (this.alive) {
             this.parts.forEach(p => {
                 p.vel = p5.Vector.random2D()
+                p.vel.y = -abs(p.vel.y)
                 p.avel = random(-0.1, 0.1)
             })
+            setTimeout(_ => gameOn = false, 3000)
+        }
     }
 
     attacked() {
@@ -197,9 +214,7 @@ class Invader {
 
     update() {
         this.wobble = (this.wobble + 1) % 20
-        if (this.hasAttacked) {
-            this.pos.y++
-        } else if (this.pos.y > width - 100) {
+        if (this.pos.y > width - 100) {
             let dir = p5.Vector.sub(ship.pos, this.pos).normalize()
             this.pos.add(dir)
         } else {
@@ -229,13 +244,43 @@ class Invader {
 
     hit() {
         this.alive = false
+        explosions.push(new Explosion(this.pos))
     }
 
     attacks(ship) {
         return this.pos.dist(ship.pos) < this.r
     }
+}
 
-    attacked() {
-        this.hasAttacked = true
+class Explosion {
+    constructor(pos) {
+        this.parts = new Array(5).fill(0).map(_ => {
+            return {
+                pos: pos.copy(),
+                vel: p5.Vector.random2D()
+            }
+        })
+        this.life = 60
+        this.alive = true
+    }
+
+    update() {
+        if (this.life-- == 0) {
+            this.alive = false;
+        }
+
+        this.parts.forEach(p => {
+            p.vel.y += 0.03
+            p.pos.add(p.vel)
+        })
+    }
+
+    show() {
+        stroke(255, 0, 0)
+        fill(255, 150, 0)
+        this.parts.forEach(p => {
+            ellipse(p.pos.x, p.pos.y, 10, 10)
+        })
+
     }
 }
